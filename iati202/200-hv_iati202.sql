@@ -2,7 +2,7 @@
 
 -- Copyright (C) 2016 Barry de Graaff <info@barrydegraaff.tk>, (C) 2012 Arthur Baan, (C) 2012 Fred Stoopendaal
 -- This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
--- This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+-- This program is distributed in the hop<narrative><![CDATA[e that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 -- You should have received a copy of the GNU General Public License along with this program. If not, see http://www.gnu.org/licenses/.
 
 -- https://github.com/barrydegraaff/iati-partnerdump-affm-compiere
@@ -176,9 +176,9 @@ is
          loop
             p ('<iati-activity xml:lang="en" last-updated-datetime="' || replace (to_char (activity.p_updated, 'yyyy-mm-dd hh24:mi:ss'), ' ', 'T') || 'Z">');
             p ('<iati-identifier>NL-KVK-41198677-AFGO_FUND-'|| activity.p_identifier ||'</iati-identifier>');
-            p ('<reporting-org ref="NL-KVK-41198677" type="21"><narrative>Hivos</narrative></reporting-org>');
-            p ('<title><narrative>'|| nvl(activity.p_title,'Untitled activity') ||'</narrative></title>');
-            p ('<description><narrative>' || nvl(activity.p_description,'Undescribed activity') || '</narrative></description>');
+            p ('<reporting-org ref="NL-KVK-41198677" type="21"><narrative><![CDATA[Hivos]]></narrative></reporting-org>');
+            p ('<title><narrative><![CDATA['|| nvl(activity.p_title,'Untitled activity') ||']]></narrative></title>');
+            p ('<description><narrative><![CDATA[' || nvl(activity.p_description,'Undescribed activity') || ']]></narrative></description>');
             p ('<participating-org ref="NL-KVK-41198677" role="2" type="21"></participating-org>');
             p ('<participating-org ref="XM-DAC-7" role="1" type="10"></participating-org>');
             p ('<activity-status code="2" />');
@@ -223,6 +223,7 @@ is
                inner join afgo_fund on hv_afgo_fundschedule.afgo_fund_id = afgo_fund.afgo_fund_id
                where 
                hv_afgo_fundschedule.afgo_fund_id = activity.afgo_fund_id
+               and hv_afgo_fundschedule.dateinvoiced <= sysdate
                group by hv_afgo_fundschedule.dateinvoiced, hv_afgo_fundschedule.description, c_currency.iso_code, afgo_fund.referenceno
                order by  hv_afgo_fundschedule.dateinvoiced
             )
@@ -230,7 +231,6 @@ is
                p ('<transaction><transaction-type code="1" />');
                p ('<transaction-date iso-date="' || to_char (nvl(transact_in.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
                p ('<value currency="' || transact_in.p_currency || '" value-date="' || to_char (nvl(transact_in.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_in.p_sum || '</value>');
-               p ('<description><narrative>' || nvl(transact_in.p_description,'Undescribed transaction') || '</narrative></description>');
                p ('<provider-org provider-activity-id="' || transact_in.p_provider_act || '" ref="XM-DAC-7" />');               
                p ('</transaction>');
             end loop;
@@ -256,7 +256,6 @@ is
                p ('<transaction><transaction-type code="2" />');
                p ('<transaction-date iso-date="' || to_char (nvl(transact_co.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
                p ('<value currency="' || transact_co.p_currency || '" value-date="' || to_char (nvl(transact_co.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_co.p_sum || '</value>');
-               p ('<description><narrative>' || nvl(transact_co.p_description,'Undescribed transaction') || '</narrative></description>');
                p ('<provider-org provider-activity-id="' || transact_co.p_provider_act || '" ref="XM-DAC-7" />');               
                p ('</transaction>');
             end loop;
@@ -285,9 +284,9 @@ is
          loop
             p ('<iati-activity xml:lang="en" last-updated-datetime="' || replace (to_char (childact.p_updated, 'yyyy-mm-dd hh24:mi:ss'), ' ', 'T') || 'Z">');
             p ('<iati-identifier>NL-KVK-41198677-AFGO_PROJECTCLUSTER-'|| childact.afgo_projectcluster_id ||'</iati-identifier>');
-            p ('<reporting-org ref="NL-KVK-41198677" type="21"><narrative>Hivos</narrative></reporting-org>');
-            p ('<title><narrative>'|| nvl(childact.p_title,'Untitled activity') ||'</narrative></title>');
-            p ('<description><narrative>' || nvl(childact.p_description,'Undescribed activity') || '</narrative></description>');
+            p ('<reporting-org ref="NL-KVK-41198677" type="21"><narrative><![CDATA[Hivos]]></narrative></reporting-org>');
+            p ('<title><narrative><![CDATA['|| nvl(childact.p_title,'Untitled activity') ||']]></narrative></title>');
+            p ('<description><narrative><![CDATA[' || nvl(childact.p_description,'Undescribed activity') || ']]></narrative></description>');
             p ('<participating-org ref="NL-KVK-41198677" role="2" type="21"></participating-org>');
             --participating partners
             for partner in (
@@ -297,7 +296,7 @@ is
                order by 1
             )
             loop
-               p ('<participating-org role="4"><narrative>' || partner.p_name || '</narrative></participating-org>');            
+               p ('<participating-org role="4"><narrative><![CDATA[' || partner.p_name || ']]></narrative></participating-org>');            
             end loop;   
             p ('<activity-status code="2" />');
             p ('<activity-date iso-date="' || to_char (nvl(childact.p_datestart,sysdate), 'yyyy-mm-dd') || '" type="1" />');
@@ -339,7 +338,6 @@ is
                jasper.hv_iati202_buza_baseline.afgo_projectcluster_id = childact.afgo_projectcluster_id 
                and jasper.hv_iati202_buza_baseline.description = 'IATI policymarker'
                and cast(regexp_replace(jasper.hv_iati202_buza_baseline.value, '[^0-9]+', '') as number) <> 0
-               --to do: and jasper.hv_iati202_buza_baseline.value <> 0 order by 1
                order by 1
             )
             loop
@@ -356,13 +354,14 @@ is
                inner join hivo_rv_commitmentallocation on afgo_commitment.afgo_commitment_id = hivo_rv_commitmentallocation.afgo_commitment_id
                inner join c_currency on hivo_rv_commitmentallocation.c_currency_id = c_currency.c_currency_id 
                where afgo_commitment.afgo_projectcluster_id = childact.afgo_projectcluster_id
+               and hivo_rv_commitmentallocation.datetrx <= sysdate
                order by hivo_rv_commitmentallocation.datetrx, hivo_rv_commitmentallocation.payamt
             )
             loop
                p ('<transaction><transaction-type code="3" />');
                p ('<transaction-date iso-date="' || to_char (nvl(transact_disb_exp.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
                p ('<value currency="' || transact_disb_exp.p_currency || '" value-date="' || to_char (nvl(transact_disb_exp.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_disb_exp.p_value || '</value>');
-               p ('<description><narrative><![CDATA[' || nvl(transact_disb_exp.p_description,'Undescribed transaction') || ']]></narrative></description>');
+               p ('<receiver-org><narrative><![CDATA[' || transact_disb_exp.p_name || ']]></narrative></receiver-org>');
                p ('</transaction>');
             end loop;
 
@@ -383,7 +382,6 @@ is
                p ('<transaction><transaction-type code="11" />');
                p ('<transaction-date iso-date="' || to_char (nvl(transact_incoming_com.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
                p ('<value currency="' || transact_incoming_com.p_currency || '" value-date="' || to_char (nvl(transact_incoming_com.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_incoming_com.p_value || '</value>');
-               p ('<description><narrative><![CDATA[' || nvl(transact_incoming_com.p_description,'Undescribed transaction') || ']]></narrative></description>');
                p ('<provider-org provider-activity-id="NL-KVK-41198677-AFGO_FUND-' || transact_incoming_com.p_referenceno || '" ref="NL-KVK-41198677" />');               
                p ('</transaction>');
             end loop;
