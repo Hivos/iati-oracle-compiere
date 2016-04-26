@@ -47,6 +47,7 @@ afgo_scheduleitem.afgo_projectcluster_id,
 afgo_assessmentline.textscoreb,
 afgo_criterium.afgo_criterium_id,
 afgo_criterium.name,
+afgo_criterium.description,
 afgo_assessmentline.integerscore,
 ad_ref_list.value
 from afgo_scheduleitem
@@ -306,16 +307,28 @@ is
             for recipient_co in (
                select name as p_code, integerscore as p_percentage from jasper.hv_iati202_buza_baseline where 
                jasper.hv_iati202_buza_baseline.afgo_projectcluster_id = childact.afgo_projectcluster_id 
-               and jasper.hv_iati202_buza_baseline.afgo_criterium_id IN ('1002909','1002910','1002911') order by 1
+               and jasper.hv_iati202_buza_baseline.description = 'IATI Country' 
+               and jasper.hv_iati202_buza_baseline.integerscore <> 0 order by 1
             )
             loop
                p ('<recipient-country code="' || recipient_co.p_code || '" percentage="' || recipient_co.p_percentage || '" />');
+            end loop;
+            --recipient region
+            for recipient_re in (
+               select name as p_code, integerscore as p_percentage from jasper.hv_iati202_buza_baseline where 
+               jasper.hv_iati202_buza_baseline.afgo_projectcluster_id = childact.afgo_projectcluster_id 
+               and jasper.hv_iati202_buza_baseline.description = 'IATI Region' 
+               and jasper.hv_iati202_buza_baseline.integerscore <> 0 order by 1
+            )
+            loop
+               p ('<recipient-region code="' || recipient_re.p_code || '" percentage="' || recipient_re.p_percentage || '" />');
             end loop;
             --sector
             for sector in (
                select name as p_code, integerscore as p_percentage from jasper.hv_iati202_buza_baseline where 
                jasper.hv_iati202_buza_baseline.afgo_projectcluster_id = childact.afgo_projectcluster_id 
-               and jasper.hv_iati202_buza_baseline.afgo_criterium_id IN ('1002906','1002907','1002908') order by 1
+               and jasper.hv_iati202_buza_baseline.description = 'IATI DAC'
+               and jasper.hv_iati202_buza_baseline.integerscore <> 0 order by 1
             )
             loop
                p ('<sector vocabulary="1" code="' || sector.p_code || '" percentage="' || sector.p_percentage || '" />');
@@ -324,7 +337,10 @@ is
             for policy_marker in (
                select name as p_code, value as p_significance from jasper.hv_iati202_buza_baseline where 
                jasper.hv_iati202_buza_baseline.afgo_projectcluster_id = childact.afgo_projectcluster_id 
-               and jasper.hv_iati202_buza_baseline.afgo_criterium_id IN ('1002800','1002801','1002802','1002803','1002804','1002805','1002806','1002807','1002808') order by 1
+               and jasper.hv_iati202_buza_baseline.description = 'IATI policymarker'
+               and cast(regexp_replace(jasper.hv_iati202_buza_baseline.value, '[^0-9]+', '') as number) <> 0
+               --to do: and jasper.hv_iati202_buza_baseline.value <> 0 order by 1
+               order by 1
             )
             loop
                p ('<policy-marker vocabulary="1" code="' || policy_marker.p_code || '" significance="' || policy_marker.p_significance || '" />');
