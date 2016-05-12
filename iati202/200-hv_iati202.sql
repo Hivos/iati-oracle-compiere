@@ -41,20 +41,38 @@ WHERE AFGO_FUNDSCHEDULE_ID NOT IN (
 '1011146'
 );
 
-CREATE OR REPLACE VIEW jasper.hv_iati202_buza_baseline AS
+CREATE OR REPLACE VIEW jasper.hv_iati202_buza_vw AS
 SELECT
 afgo_scheduleitem.afgo_projectcluster_id,
-afgo_assessmentline.textscoreb,
+afgo_criteriumset.afgo_criteriumset_id,
 afgo_criterium.afgo_criterium_id,
-afgo_criterium.name,
+afgo_scheduleitem.afgo_scheduleitem_id,
+afgo_scheduleitem.datedoc,
+afgo_scheduleitemtype.name as afgo_scheduleitem_name,
+afgo_criteriumset.description as setdescription,
+afgo_criteriumset.help as sethelp,
+afgo_criteriumset.documentnote as setnote,
 afgo_criterium.description,
+afgo_criterium.name as name,
+afgo_criterium.help as help,
+afgo_criterium.documentnote as documentnote,
+case when to_char(ad_reference.description) = 'Float Number' then '1'
+when to_char(ad_reference.description) ='10 Digit numeric' then '2' 
+end as measure,
+afgo_assessmentline.textscoreb,
 afgo_assessmentline.integerscore,
+afgo_assessmentline.numericscore,
+afgo_assessmentline.longdescriptionb,
 ad_ref_list.value
 from afgo_scheduleitem
 left outer join afgo_assessment on afgo_scheduleitem.afgo_scheduleitem_id = afgo_assessment.afgo_scheduleitem_id
 left outer join afgo_assessmentline on afgo_assessmentline.afgo_assessment_id = afgo_assessment.afgo_assessment_id
 left outer join afgo_criterium on afgo_assessmentline.afgo_criterium_id = afgo_criterium.afgo_criterium_id
-left outer join ad_ref_list on afgo_assessmentline.listscore_id = ad_ref_list.ad_ref_list_id;
+left outer join ad_ref_list on afgo_assessmentline.listscore_id = ad_ref_list.ad_ref_list_id
+left outer join afgo_scheduleitemtype on afgo_scheduleitem.afgo_scheduleitemtype_id = afgo_scheduleitemtype.afgo_scheduleitemtype_id
+left outer join afgo_criteriumset on afgo_assessmentline.afgo_criteriumset_id = afgo_criteriumset.afgo_criteriumset_id
+left outer join ad_reference on afgo_criterium.ad_reference_id = ad_reference.ad_reference_id;
+
 
 CREATE OR REPLACE PACKAGE JASPER.hv_iati202_buza
 is
@@ -272,7 +290,7 @@ is
             (select referenceno from afgo_fund where afgo_fund_id = afgo_fundallocation.afgo_fund_id) as p_referenceno,
             afgo_projectcluster.updated as p_updated,
             afgo_projectcluster.name as p_title,
-            (select textscoreb from jasper.hv_iati202_buza_baseline where jasper.hv_iati202_buza_baseline.afgo_projectcluster_id = afgo_projectcluster.afgo_projectcluster_id AND jasper.hv_iati202_buza_baseline.afgo_criterium_id = '1002300') as p_description,
+            (select textscoreb from jasper.hv_iati202_buza_vw where jasper.hv_iati202_buza_vw.afgo_projectcluster_id = afgo_projectcluster.afgo_projectcluster_id AND jasper.hv_iati202_buza_vw.afgo_criterium_id = '1002300') as p_description,
             afgo_projectcluster.startdate as p_datestart,
             afgo_projectcluster.enddate as p_dateend
             from afgo_projectcluster
@@ -290,9 +308,9 @@ is
             p ('<participating-org ref="NL-KVK-41198677" role="2" type="21"></participating-org>');
             --participating partners
             for partner in (
-               select distinct c_bpartner.name as p_name from afgo_commitment 
-               inner join c_bpartner on afgo_commitment.c_bpartner_id = c_bpartner.c_bpartner_id
-               where afgo_commitment.afgo_projectcluster_id = childact.afgo_projectcluster_id
+               select distinct hv_c_bpartner.name as p_name from jasper.hv_afgo_commitment 
+               inner join jasper.hv_c_bpartner on jasper.hv_afgo_commitment.c_bpartner_id = jasper.hv_c_bpartner.c_bpartner_id
+               where hv_afgo_commitment.afgo_projectcluster_id = childact.afgo_projectcluster_id
                order by 1
             )
             loop
@@ -304,40 +322,40 @@ is
             p ('<contact-info type="1"><telephone>0031703765500</telephone><email>info@hivos.org</email></contact-info>');
             --recipient country
             for recipient_co in (
-               select name as p_code, integerscore as p_percentage from jasper.hv_iati202_buza_baseline where 
-               jasper.hv_iati202_buza_baseline.afgo_projectcluster_id = childact.afgo_projectcluster_id 
-               and jasper.hv_iati202_buza_baseline.description = 'IATI Country' 
-               and jasper.hv_iati202_buza_baseline.integerscore <> 0 order by 1
+               select name as p_code, integerscore as p_percentage from jasper.hv_iati202_buza_vw where 
+               jasper.hv_iati202_buza_vw.afgo_projectcluster_id = childact.afgo_projectcluster_id 
+               and jasper.hv_iati202_buza_vw.description = 'IATI Country' 
+               and jasper.hv_iati202_buza_vw.integerscore <> 0 order by 1
             )
             loop
                p ('<recipient-country code="' || recipient_co.p_code || '" percentage="' || recipient_co.p_percentage || '" />');
             end loop;
             --recipient region
             for recipient_re in (
-               select name as p_code, integerscore as p_percentage from jasper.hv_iati202_buza_baseline where 
-               jasper.hv_iati202_buza_baseline.afgo_projectcluster_id = childact.afgo_projectcluster_id 
-               and jasper.hv_iati202_buza_baseline.description = 'IATI Region' 
-               and jasper.hv_iati202_buza_baseline.integerscore <> 0 order by 1
+               select name as p_code, integerscore as p_percentage from jasper.hv_iati202_buza_vw where 
+               jasper.hv_iati202_buza_vw.afgo_projectcluster_id = childact.afgo_projectcluster_id 
+               and jasper.hv_iati202_buza_vw.description = 'IATI Region' 
+               and jasper.hv_iati202_buza_vw.integerscore <> 0 order by 1
             )
             loop
                p ('<recipient-region code="' || recipient_re.p_code || '" percentage="' || recipient_re.p_percentage || '" />');
             end loop;
             --sector
             for sector in (
-               select name as p_code, integerscore as p_percentage from jasper.hv_iati202_buza_baseline where 
-               jasper.hv_iati202_buza_baseline.afgo_projectcluster_id = childact.afgo_projectcluster_id 
-               and jasper.hv_iati202_buza_baseline.description = 'IATI DAC'
-               and jasper.hv_iati202_buza_baseline.integerscore <> 0 order by 1
+               select name as p_code, integerscore as p_percentage from jasper.hv_iati202_buza_vw where 
+               jasper.hv_iati202_buza_vw.afgo_projectcluster_id = childact.afgo_projectcluster_id 
+               and jasper.hv_iati202_buza_vw.description = 'IATI DAC'
+               and jasper.hv_iati202_buza_vw.integerscore <> 0 order by 1
             )
             loop
                p ('<sector vocabulary="1" code="' || sector.p_code || '" percentage="' || sector.p_percentage || '" />');
             end loop;
             --policy marker
             for policy_marker in (
-               select name as p_code, value as p_significance from jasper.hv_iati202_buza_baseline where 
-               jasper.hv_iati202_buza_baseline.afgo_projectcluster_id = childact.afgo_projectcluster_id 
-               and jasper.hv_iati202_buza_baseline.description = 'IATI policymarker'
-               and cast(regexp_replace(jasper.hv_iati202_buza_baseline.value, '[^0-9]+', '') as number) <> 0
+               select name as p_code, value as p_significance from jasper.hv_iati202_buza_vw where 
+               jasper.hv_iati202_buza_vw.afgo_projectcluster_id = childact.afgo_projectcluster_id 
+               and jasper.hv_iati202_buza_vw.description = 'IATI policymarker'
+               and cast(regexp_replace(jasper.hv_iati202_buza_vw.value, '[^0-9]+', '') as number) <> 0
                order by 1
             )
             loop
@@ -349,11 +367,16 @@ is
             p ('<default-tied-status code="5" />');
             --transaction disbursement and expenditure loop
             for transact_disb_exp in (
-               select hivo_rv_commitmentallocation.datetrx as p_date, hivo_rv_commitmentallocation.description as p_description, c_bpartner.name as p_name, c_currency.iso_code as p_currency, hivo_rv_commitmentallocation.payamt as p_value from afgo_commitment 
-               inner join c_bpartner on afgo_commitment.c_bpartner_id = c_bpartner.c_bpartner_id
-               inner join hivo_rv_commitmentallocation on afgo_commitment.afgo_commitment_id = hivo_rv_commitmentallocation.afgo_commitment_id
+               select hivo_rv_commitmentallocation.datetrx as p_date, hivo_rv_commitmentallocation.description as p_description, hv_c_bpartner.name as p_name, c_currency.iso_code as p_currency, hivo_rv_commitmentallocation.payamt as p_value from jasper.hv_afgo_commitment 
+               inner join jasper.hv_c_bpartner on hv_afgo_commitment.c_bpartner_id = hv_c_bpartner.c_bpartner_id
+               inner join hivo_rv_commitmentallocation on hv_afgo_commitment.afgo_commitment_id = hivo_rv_commitmentallocation.afgo_commitment_id
                inner join c_currency on hivo_rv_commitmentallocation.c_currency_id = c_currency.c_currency_id 
-               where afgo_commitment.afgo_projectcluster_id = childact.afgo_projectcluster_id
+               inner join c_invoice on jasper.hv_afgo_commitment .afgo_commitment_id = c_invoice.afgo_commitment_id
+               inner join c_invoiceline on c_invoice.c_invoice_id = c_invoiceline.c_invoice_id
+               inner join afgo_fundallocation on c_invoiceline.c_invoiceline_id = afgo_fundallocation.c_invoiceline_id               
+               where
+               hv_afgo_commitment.afgo_projectcluster_id = childact.afgo_projectcluster_id
+               and afgo_fundallocation.afgo_fund_id = childact.afgo_fund_id
                and hivo_rv_commitmentallocation.datetrx <= sysdate
                order by hivo_rv_commitmentallocation.datetrx, hivo_rv_commitmentallocation.payamt
             )
@@ -368,11 +391,11 @@ is
             --transaction incoming commitment loop
             for transact_incoming_com in (
                select a.p_date, a.p_description, a.afgo_fund_id, a.p_currency, a.p_value, b.referenceno as p_referenceno from (
-               select afgo_commitmentline.updated as p_date, afgo_commitmentline.description as p_description, max(afgo_fundallocation.afgo_fund_id) as afgo_fund_id, c_currency.iso_code as p_currency, afgo_commitmentline.linenetamt as p_value from afgo_commitment
-               inner join afgo_commitmentline on afgo_commitment.afgo_commitment_id = afgo_commitmentline.afgo_commitment_id
+               select afgo_commitmentline.updated as p_date, afgo_commitmentline.description as p_description, max(afgo_fundallocation.afgo_fund_id) as afgo_fund_id, c_currency.iso_code as p_currency, afgo_commitmentline.linenetamt as p_value from jasper.hv_afgo_commitment
+               inner join afgo_commitmentline on hv_afgo_commitment.afgo_commitment_id = afgo_commitmentline.afgo_commitment_id
                inner join afgo_fundallocation on afgo_commitmentline.afgo_commitmentline_id = afgo_fundallocation.afgo_commitmentline_id
-               inner join c_currency on afgo_commitment.c_currency_id = c_currency.c_currency_id 
-               where afgo_commitment.afgo_projectcluster_id = childact.afgo_projectcluster_id
+               inner join c_currency on hv_afgo_commitment.c_currency_id = c_currency.c_currency_id 
+               where hv_afgo_commitment.afgo_projectcluster_id = childact.afgo_projectcluster_id
                and afgo_fund_id = childact.afgo_fund_id
                group by afgo_commitmentline.updated, afgo_commitmentline.description, c_currency.iso_code, afgo_commitmentline.linenetamt
                order by afgo_commitmentline.updated, afgo_commitmentline.linenetamt
@@ -385,8 +408,69 @@ is
                p ('<provider-org provider-activity-id="NL-KVK-41198677-AFGO_FUND-' || transact_incoming_com.p_referenceno || '" ref="NL-KVK-41198677" />');               
                p ('</transaction>');
             end loop;
-            
+
             p ('<related-activity ref="NL-KVK-41198677-AFGO_FUND-' || childact.p_referenceno || '" type="1" />');
+            
+            --result loop
+            --order by not possible in distinct http://docs.oracle.com/javadb/10.5.3.0/ref/rrefsqlj13658.html
+            for result_loop in (
+               select distinct a.afgo_criteriumset_id, a.setdescription as p_type, a.sethelp as p_title, a.setnote as p_description 
+               from jasper.hv_iati202_buza_vw a where 
+               a.afgo_projectcluster_id = childact.afgo_projectcluster_id 
+               and a.description = 'IATI indicator'
+            )
+            loop
+               p ('<result type="'|| result_loop.p_type ||'" aggregation-status="0">');
+               p ('<title><narrative><![CDATA[' || result_loop.p_title || ']]></narrative></title>');
+               p ('<description><narrative><![CDATA[' || result_loop.p_description || ']]></narrative></description>');
+               
+               for indicator_loop in (
+                  select distinct a.afgo_criterium_id, a.measure as measure, a.help as p_title, a.documentnote as p_description 
+                  from jasper.hv_iati202_buza_vw a where 
+                  a.afgo_projectcluster_id = childact.afgo_projectcluster_id 
+                  and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
+                  and a.description = 'IATI indicator'                 
+               )
+               loop
+                  p ('<indicator measure="' || indicator_loop.measure || '" ascending="1">');
+                  p ('<title><narrative><![CDATA[' || indicator_loop.p_title || ']]></narrative></title>');
+                  p ('<description><narrative><![CDATA[' || indicator_loop.p_description || ']]></narrative></description>');                  
+
+                  for indicator_value_loop in (
+                     select a.afgo_scheduleitem_name, extract (year from a.datedoc) as p_year, a.longdescriptionb as p_description, a.numericscore || a.integerscore as p_value, a.afgo_criterium_id, a.afgo_scheduleitem_id
+                     from jasper.hv_iati202_buza_vw a where 
+                     a.afgo_projectcluster_id = childact.afgo_projectcluster_id 
+                     and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
+                     and a.afgo_criterium_id = indicator_loop.afgo_criterium_id
+                     and a.description = 'IATI indicator'                                             
+                     order by decode(a.afgo_scheduleitem_name, 'IATI all baseline data', 1, 'IATI results target data', 2, 'IATI results actual data', 3, 4)
+                  )
+                  loop
+                     if (indicator_value_loop.afgo_scheduleitem_name = 'IATI all baseline data') then
+                        p ('<baseline year="' || indicator_value_loop.p_year || '" value="' || indicator_value_loop.p_value || '">');
+                        p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
+                        p ('</baseline>');
+                     elsif (indicator_value_loop.afgo_scheduleitem_name = 'IATI results target data') then
+                        p ('<period>');
+                        p ('<period-start iso-date="' || to_char (nvl(childact.p_datestart,sysdate), 'yyyy-mm-dd') || '" />');
+                        p ('<period-end iso-date="' || to_char (nvl(childact.p_dateend,sysdate), 'yyyy-mm-dd') || '" />');
+                        p ('<target value="' || indicator_value_loop.p_value || '">');
+                        p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
+                        p ('</target></period>');
+                     else   
+                        p ('<period>');
+                        p ('<period-start iso-date="' || to_char (nvl(childact.p_datestart,sysdate), 'yyyy-mm-dd') || '" />');
+                        p ('<period-end iso-date="' || to_char (nvl(childact.p_dateend,sysdate), 'yyyy-mm-dd') || '" />');
+                        p ('<actual value="' || indicator_value_loop.p_value || '">');
+                        p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
+                        p ('</actual></period>');
+                     end if;
+                  end loop;
+                  p ('</indicator>');
+               end loop;
+               
+               p ('</result>');
+            end loop;            
             p ('</iati-activity>');
             end loop;
             
