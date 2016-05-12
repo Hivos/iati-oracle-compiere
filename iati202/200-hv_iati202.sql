@@ -136,39 +136,11 @@ is
    is
       ll_xml clob;
 
-      procedure pl (pl_text clob)
-      is
-      begin
-         dbms_lob.append (ll_xml, dbms_xmlgen.convert (pl_text, dbms_xmlgen.entity_encode));
-      exception
-         when others then
-            dbms_lob.writeappend (ll_xml, 9, '<![CDATA[');
-            dbms_lob.append (ll_xml, pl_text);
-            dbms_lob.writeappend (ll_xml, 4, ']]>' || chr (10));
-      end;
-
       procedure p (lv_regel varchar2)
       is
       begin
          -- dbms_output.put_line (lv_regel);
          dbms_lob.writeappend (ll_xml, length (lv_regel) + 1, lv_regel || chr (10));
-      end;
-
-      function cd (lv_regel varchar2)
-         return varchar2
-      is
-      begin
-         return dbms_xmlgen.convert (lv_regel, dbms_xmlgen.entity_encode);
-      exception
-         when others then
-            return '<![CDATA[' || lv_regel || ']]>';
-      end;
-
-      function cdata (lv_regel varchar2)
-         return varchar2
-      is
-      begin
-         return '<![CDATA[' || lv_regel || ']]>';
       end;
       
       begin
