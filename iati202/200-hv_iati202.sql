@@ -229,26 +229,25 @@ is
 
             --transaction incoming loop
             for transact_in in (
-               select 
-               hv_afgo_fundschedule.dateinvoiced as p_date,
+               select
+               c_invoice.dateinvoiced as p_date,
                hv_afgo_fundschedule.description as p_description,
                c_currency.iso_code as p_currency,
                afgo_fund.referenceno as p_provider_act,
-               sum(hv_afgo_fundschedule.invoicedamt) as p_sum
+               hv_afgo_fundschedule.invoicedamt as p_value
                from jasper.hv_afgo_fundschedule
-               inner join afgo_quarter on jasper.hv_afgo_fundschedule.afgo_quarter_id = afgo_quarter.afgo_quarter_id
                inner join c_currency on hv_afgo_fundschedule.c_currency_id = c_currency.c_currency_id 
                inner join afgo_fund on hv_afgo_fundschedule.afgo_fund_id = afgo_fund.afgo_fund_id
+               inner join c_invoice on jasper.hv_afgo_fundschedule.afgo_fundschedule_id = c_invoice.afgo_fundschedule_id
                where 
                hv_afgo_fundschedule.afgo_fund_id = activity.afgo_fund_id
-               and hv_afgo_fundschedule.dateinvoiced <= sysdate
-               group by hv_afgo_fundschedule.dateinvoiced, hv_afgo_fundschedule.description, c_currency.iso_code, afgo_fund.referenceno
-               order by  hv_afgo_fundschedule.dateinvoiced
-            )
+               and c_invoice.dateinvoiced <= sysdate
+               order by c_invoice.dateinvoiced
+               )
             loop
                p ('<transaction><transaction-type code="1" />');
                p ('<transaction-date iso-date="' || to_char (nvl(transact_in.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
-               p ('<value currency="' || transact_in.p_currency || '" value-date="' || to_char (nvl(transact_in.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_in.p_sum || '</value>');
+               p ('<value currency="' || transact_in.p_currency || '" value-date="' || to_char (nvl(transact_in.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_in.p_value || '</value>');
                p ('<provider-org provider-activity-id="' || transact_in.p_provider_act || '" ref="XM-DAC-7" />');               
                p ('</transaction>');
             end loop;
