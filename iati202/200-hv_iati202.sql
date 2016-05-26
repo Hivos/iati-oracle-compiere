@@ -408,7 +408,7 @@ is
                   p ('<description><narrative><![CDATA[' || indicator_loop.p_description || ']]></narrative></description>');                  
 
                   for indicator_value_loop in (
-                     select a.afgo_scheduleitem_name, extract (year from a.datedoc) as p_year, a.longdescriptionb as p_description, a.numericscore || a.integerscore as p_value, a.afgo_criterium_id, a.afgo_scheduleitem_id
+                     select a.afgo_scheduleitem_name, a.datedoc datedoc, extract (year from a.datedoc) as p_year, a.longdescriptionb as p_description, a.numericscore || a.integerscore as p_value, a.afgo_criterium_id, a.afgo_scheduleitem_id
                      from jasper.hv_iati202_buza_vw a where 
                      a.afgo_projectcluster_id = childact.afgo_projectcluster_id 
                      and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
@@ -423,15 +423,15 @@ is
                         p ('</baseline>');
                      elsif (indicator_value_loop.afgo_scheduleitem_name = 'IATI results target data') then
                         p ('<period>');
-                        p ('<period-start iso-date="' || to_char (nvl(childact.p_datestart,sysdate), 'yyyy-mm-dd') || '" />');
+                        p ('<period-start iso-date="' || to_char (trunc(nvl(indicator_value_loop.datedoc,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
                         p ('<period-end iso-date="' || to_char (nvl(childact.p_dateend,sysdate), 'yyyy-mm-dd') || '" />');
                         p ('<target value="' || indicator_value_loop.p_value || '">');
                         p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
                         p ('</target></period>');
                      else   
                         p ('<period>');
-                        p ('<period-start iso-date="' || to_char (nvl(childact.p_datestart,sysdate), 'yyyy-mm-dd') || '" />');
-                        p ('<period-end iso-date="' || to_char (nvl(childact.p_dateend,sysdate), 'yyyy-mm-dd') || '" />');
+                        p ('<period-start iso-date="' || to_char(trunc(nvl(childact.p_datestart,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
+                        p ('<period-end iso-date="' || to_char(trunc(nvl(indicator_value_loop.datedoc,sysdate),'YEAR')+365, 'yyyy-mm-dd') || '" />');
                         p ('<actual value="' || indicator_value_loop.p_value || '">');
                         p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
                         p ('</actual></period>');
