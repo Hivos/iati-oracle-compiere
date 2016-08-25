@@ -159,7 +159,7 @@ is
             afgo_fund.description as p_description,
             afgo_fund.startdate as p_datestart,
             afgo_fund.enddate as p_dateend
-            from afgo_fund where afgo_fund_id in ('1010612','1010613','1010614')
+            from afgo_fund where afgo_fund_id in ('1010612','1010613','1010614','1011100')
             order by afgo_fund.documentno
          )
       
@@ -171,11 +171,12 @@ is
             p ('<description><narrative><![CDATA[' || nvl(activity.p_description,'Undescribed activity') || ']]></narrative></description>');
             p ('<participating-org ref="NL-KVK-41198677" role="2" type="21"></participating-org>');
             p ('<participating-org ref="XM-DAC-7" role="1" type="10"></participating-org>');
+            p ('<participating-org ref="NL-KVK-41198677" role="4" type="21"></participating-org>');
             p ('<activity-status code="2" />');
             p ('<activity-date iso-date="' || to_char (nvl(activity.p_datestart,sysdate), 'yyyy-mm-dd') || '" type="1" />');
             p ('<activity-date iso-date="' || to_char (nvl(activity.p_dateend,sysdate+1), 'yyyy-mm-dd') || '" type="3" />');
             p ('<contact-info type="1"><telephone>0031703765500</telephone><email>info@hivos.org</email></contact-info>');
-            p ('<recipient-country code="NL" percentage="100" />');
+            p ('<recipient-region code="998" percentage="100" />');
 
             --budget loop
             for budget in (
@@ -242,7 +243,7 @@ is
                order by  hv_afgo_fundschedule.dateinvoiced
             )
             loop
-               p ('<transaction><transaction-type code="2" />');
+               p ('<transaction><transaction-type code="11" />');
                p ('<transaction-date iso-date="' || to_char (nvl(transact_co.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
                p ('<value currency="' || transact_co.p_currency || '" value-date="' || to_char (nvl(transact_co.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_co.p_sum || '</value>');
                p ('<provider-org provider-activity-id="' || transact_co.p_provider_act || '" ref="XM-DAC-7" />');               
