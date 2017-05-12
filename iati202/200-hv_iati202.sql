@@ -48,7 +48,12 @@ afgo_criteriumset.afgo_criteriumset_id,
 afgo_criterium.afgo_criterium_id,
 afgo_scheduleitem.afgo_scheduleitem_id,
 afgo_scheduleitem.datedoc,
-afgo_scheduleitemtype.name as afgo_scheduleitem_name,
+case 
+when to_char(afgo_scheduleitemtype.name) = 'IATI all baseline data2' then 'IATI all baseline data'
+when to_char(afgo_scheduleitemtype.name) = 'IATI results target data2' then 'IATI results target data'
+when to_char(afgo_scheduleitemtype.name) = 'IATI results actual data2' then 'IATI results actual data'
+else to_char(afgo_scheduleitemtype.name)
+end as afgo_scheduleitem_name,
 afgo_criteriumset.description as setdescription,
 afgo_criteriumset.help as sethelp,
 afgo_criteriumset.documentnote as setnote,
@@ -56,13 +61,18 @@ afgo_criterium.description,
 afgo_criterium.name as name,
 afgo_criterium.help as help,
 afgo_criterium.documentnote as documentnote,
-case when to_char(ad_reference.description) = 'Float Number' then '1'
-when to_char(ad_reference.description) ='10 Digit numeric' then '2' 
+case
+when to_char(ad_reference.description) = 'Float Number' then '1'
+when to_char(ad_reference.description) ='10 Digit numeric' then '2'
+when to_char(ad_reference.description) ='Reference List' then '1'
 end as measure,
+afgo_assessmentline.textscore,
 afgo_assessmentline.textscoreb,
 afgo_assessmentline.integerscore,
 afgo_assessmentline.numericscore,
-afgo_assessmentline.longdescriptionb,
+afgo_assessmentline.longdescription,
+afgo_assessmentline.amountscore,
+afgo_assessmentline.BOOLEANSCORE,
 ad_ref_list.value
 from afgo_scheduleitem
 left outer join afgo_assessment on afgo_scheduleitem.afgo_scheduleitem_id = afgo_assessment.afgo_scheduleitem_id
@@ -77,6 +87,7 @@ left outer join ad_reference on afgo_criterium.ad_reference_id = ad_reference.ad
 CREATE OR REPLACE PACKAGE JASPER.hv_iati202_buza
 is
    procedure mainprogram;
+   procedure orgfile;
 end;
 /
 
@@ -159,12 +170,12 @@ is
             afgo_fund.description as p_description,
             afgo_fund.startdate as p_datestart,
             afgo_fund.enddate as p_dateend
-            from afgo_fund where afgo_fund_id in ('1010612','1010613','1010614','1011100')
+            from afgo_fund where afgo_fund_id in ('1010612','1010613','1010614','1011100','1011900')
             order by afgo_fund.documentno
          )
       
          loop
-            p ('<iati-activity xml:lang="en" last-updated-datetime="' || replace (to_char (activity.p_updated, 'yyyy-mm-dd hh24:mi:ss'), ' ', 'T') || 'Z">');
+            p ('<iati-activity xml:lang="en" last-updated-datetime="' || replace (to_char (sysdate, 'yyyy-mm-dd hh24:mi:ss'), ' ', 'T') || 'Z">');
             p ('<iati-identifier>NL-KVK-41198677-AFGO_FUND-'|| activity.p_identifier ||'</iati-identifier>');
             p ('<reporting-org ref="NL-KVK-41198677" type="21"><narrative><![CDATA[Hivos]]></narrative></reporting-org>');
             p ('<title><narrative><![CDATA['|| nvl(activity.p_title,'Untitled activity') ||']]></narrative></title>');
@@ -207,7 +218,7 @@ is
                hv_afgo_fundschedule.description as p_description,
                c_currency.iso_code as p_currency,
                afgo_fund.referenceno as p_provider_act,
-               hv_afgo_fundschedule.invoicedamt as p_value
+               c_invoice.grandtotal as p_value
                from jasper.hv_afgo_fundschedule
                inner join c_currency on hv_afgo_fundschedule.c_currency_id = c_currency.c_currency_id 
                inner join afgo_fund on hv_afgo_fundschedule.afgo_fund_id = afgo_fund.afgo_fund_id
@@ -249,6 +260,20 @@ is
                p ('<provider-org provider-activity-id="' || transact_co.p_provider_act || '" ref="XM-DAC-7" />');               
                p ('</transaction>');
             end loop;
+
+            --document link loop
+            for document_link in (
+               select exta_attxt_url as p_filename, exta_attxt_name as p_title, exta_attxt_postaldate as p_date
+               from jasper.hv_att_qvw where jasper.hv_att_qvw.exta_category_id='1000300' and jasper.hv_att_qvw.record_id = activity.afgo_fund_id
+            )
+            loop
+               p ('<document-link format="application/octet-stream" url="https://iati.hivos.org/docs/' || document_link.p_filename || '">');
+               p('<title><narrative><![CDATA[' || document_link.p_title || ']]></narrative></title>');
+               p('<category code="A01"/>');
+               p('<language code="en" />');
+               p('<document-date iso-date="' || to_char (nvl(document_link.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
+               p('</document-link>');
+            end loop;
             
             p ('</iati-activity>');
 
@@ -262,7 +287,7 @@ is
             (select referenceno from afgo_fund where afgo_fund_id = afgo_fundallocation.afgo_fund_id) as p_referenceno,
             afgo_projectcluster.updated as p_updated,
             afgo_projectcluster.name as p_title,
-            (select textscoreb from jasper.hv_iati202_buza_vw where jasper.hv_iati202_buza_vw.afgo_projectcluster_id = afgo_projectcluster.afgo_projectcluster_id AND jasper.hv_iati202_buza_vw.afgo_criterium_id = '1002300') as p_description,
+            (select DBMS_LOB.SUBSTR(textscore, 32000) from jasper.hv_iati202_buza_vw where jasper.hv_iati202_buza_vw.afgo_projectcluster_id = afgo_projectcluster.afgo_projectcluster_id AND jasper.hv_iati202_buza_vw.afgo_criterium_id = '1002300' and jasper.hv_iati202_buza_vw.afgo_scheduleitem_name = 'Projectcluster Basic Information') as p_description,
             afgo_projectcluster.startdate as p_datestart,
             afgo_projectcluster.enddate as p_dateend
             from afgo_projectcluster
@@ -272,7 +297,7 @@ is
          )
       
          loop
-            p ('<iati-activity xml:lang="en" last-updated-datetime="' || replace (to_char (childact.p_updated, 'yyyy-mm-dd hh24:mi:ss'), ' ', 'T') || 'Z">');
+            p ('<iati-activity xml:lang="en" last-updated-datetime="' || replace (to_char (sysdate, 'yyyy-mm-dd hh24:mi:ss'), ' ', 'T') || 'Z">');
             p ('<iati-identifier>NL-KVK-41198677-AFGO_PROJECTCLUSTER-'|| childact.afgo_projectcluster_id ||'</iati-identifier>');
             p ('<reporting-org ref="NL-KVK-41198677" type="21"><narrative><![CDATA[Hivos]]></narrative></reporting-org>');
             p ('<title><narrative><![CDATA['|| nvl(childact.p_title,'Untitled activity') ||']]></narrative></title>');
@@ -337,27 +362,31 @@ is
             p ('<default-finance-type code="110" />');
             p ('<default-aid-type code="C01" />');
             p ('<default-tied-status code="5" />');
-            --transaction disbursement and expenditure loop
-            for transact_disb_exp in (
-               select hivo_rv_commitmentallocation.datetrx as p_date, hivo_rv_commitmentallocation.description as p_description, hv_c_bpartner.name as p_name, c_currency.iso_code as p_currency, hivo_rv_commitmentallocation.payamt as p_value from jasper.hv_afgo_commitment 
-               inner join jasper.hv_c_bpartner on hv_afgo_commitment.c_bpartner_id = hv_c_bpartner.c_bpartner_id
-               inner join hivo_rv_commitmentallocation on hv_afgo_commitment.afgo_commitment_id = hivo_rv_commitmentallocation.afgo_commitment_id
-               inner join c_currency on hivo_rv_commitmentallocation.c_currency_id = c_currency.c_currency_id 
-               inner join c_invoice on jasper.hv_afgo_commitment .afgo_commitment_id = c_invoice.afgo_commitment_id
-               inner join c_invoiceline on c_invoice.c_invoice_id = c_invoiceline.c_invoice_id
-               inner join afgo_fundallocation on c_invoiceline.c_invoiceline_id = afgo_fundallocation.c_invoiceline_id               
-               where
-               hv_afgo_commitment.afgo_projectcluster_id = childact.afgo_projectcluster_id
+            --transaction disbursement/expenditure loop
+            for transact_disb in (
+               select c_invoice.dateacct as p_date, hv_c_bpartner.name as p_name, c_currency.iso_code as p_currency, c_invoiceline.linenetamt as p_value 
+               from afgo_fundallocation 
+               inner join c_invoiceline on afgo_fundallocation.c_invoiceline_id = c_invoiceline.c_invoiceline_id
+               inner join c_invoice on c_invoiceline.c_invoice_id = c_invoice.c_invoice_id
+               inner join jasper.hv_c_bpartner on c_invoice.c_bpartner_id = jasper.hv_c_bpartner.c_bpartner_id
+               inner join c_currency on c_invoice.c_currency_id = c_currency.c_currency_id 
+               where 
+               afgo_fundallocation.afgo_projectcluster_id = childact.afgo_projectcluster_id
                and afgo_fundallocation.afgo_fund_id = childact.afgo_fund_id
-               and hivo_rv_commitmentallocation.datetrx <= sysdate
-               order by hivo_rv_commitmentallocation.datetrx, hivo_rv_commitmentallocation.payamt
+               and c_invoice.dateacct <= sysdate
+               and c_invoice.docstatus = 'CO'
+               order by c_invoice.dateacct, c_invoiceline.linenetamt
             )
             loop
-               p ('<transaction><transaction-type code="3" />');
-               p ('<transaction-date iso-date="' || to_char (nvl(transact_disb_exp.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
-               p ('<value currency="' || transact_disb_exp.p_currency || '" value-date="' || to_char (nvl(transact_disb_exp.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_disb_exp.p_value || '</value>');
-               p ('<receiver-org><narrative><![CDATA[' || transact_disb_exp.p_name || ']]></narrative></receiver-org>');
-               p ('</transaction>');
+               if regexp_like (lower(transact_disb.p_name), 'hivos') then
+                  p ('<transaction><transaction-type code="4" />');
+               else
+                  p ('<transaction><transaction-type code="3" />');
+               end if;    
+               p ('<transaction-date iso-date="' || to_char (nvl(transact_disb.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
+               p ('<value currency="' || transact_disb.p_currency || '" value-date="' || to_char (nvl(transact_disb.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_disb.p_value || '</value>');
+               p ('<receiver-org><narrative><![CDATA[' || transact_disb.p_name || ']]></narrative></receiver-org>');
+               p ('</transaction>');               
             end loop;
 
             --transaction incoming commitment loop
@@ -379,6 +408,20 @@ is
                p ('<value currency="' || transact_incoming_com.p_currency || '" value-date="' || to_char (nvl(transact_incoming_com.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_incoming_com.p_value || '</value>');
                p ('<provider-org provider-activity-id="NL-KVK-41198677-AFGO_FUND-' || transact_incoming_com.p_referenceno || '" ref="NL-KVK-41198677" />');               
                p ('</transaction>');
+            end loop;
+            
+            --document link loop
+            for document_link in (
+               select exta_attxt_url as p_filename, exta_attxt_name as p_title, exta_attxt_postaldate as p_date
+               from jasper.hv_att_qvw where jasper.hv_att_qvw.exta_category_id='1000300' and jasper.hv_att_qvw.record_id = childact.afgo_projectcluster_id
+            )
+            loop
+               p ('<document-link format="application/octet-stream" url="https://iati.hivos.org/docs/' || document_link.p_filename || '">');
+               p('<title><narrative><![CDATA[' || document_link.p_title || ']]></narrative></title>');
+               p('<category code="A01"/>');
+               p('<language code="en" />');
+               p('<document-date iso-date="' || to_char (nvl(document_link.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
+               p('</document-link>');
             end loop;
 
             p ('<related-activity ref="NL-KVK-41198677-AFGO_FUND-' || childact.p_referenceno || '" type="1" />');
@@ -409,7 +452,7 @@ is
                   p ('<description><narrative><![CDATA[' || indicator_loop.p_description || ']]></narrative></description>');                  
 
                   for indicator_value_loop in (
-                     select a.afgo_scheduleitem_name, a.datedoc datedoc, extract (year from a.datedoc) as p_year, a.longdescriptionb as p_description, a.numericscore || a.integerscore as p_value, a.afgo_criterium_id, a.afgo_scheduleitem_id
+                     select a.afgo_scheduleitem_name, a.datedoc datedoc, extract (year from a.datedoc) as p_year, DBMS_LOB.SUBSTR(a.longdescription, 32000) as p_description, a.numericscore || a.integerscore as p_value, a.afgo_criterium_id
                      from jasper.hv_iati202_buza_vw a where 
                      a.afgo_projectcluster_id = childact.afgo_projectcluster_id 
                      and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
@@ -424,7 +467,7 @@ is
                         p ('</baseline>');
                      elsif (indicator_value_loop.afgo_scheduleitem_name = 'IATI results target data') then
                         p ('<period>');
-                        p ('<period-start iso-date="' || to_char (trunc(nvl(indicator_value_loop.datedoc,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
+                        p ('<period-start iso-date="' || to_char(trunc(nvl(childact.p_datestart,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
                         p ('<period-end iso-date="' || to_char (nvl(childact.p_dateend,sysdate), 'yyyy-mm-dd') || '" />');
                         p ('<target value="' || indicator_value_loop.p_value || '">');
                         p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
@@ -432,7 +475,7 @@ is
                      else   
                         p ('<period>');
                         p ('<period-start iso-date="' || to_char(trunc(nvl(childact.p_datestart,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
-                        p ('<period-end iso-date="' || to_char(trunc(nvl(indicator_value_loop.datedoc,sysdate),'YEAR')+365, 'yyyy-mm-dd') || '" />');
+                        p ('<period-end iso-date="' || to_char(sysdate, 'yyyy-mm-dd') || '" />');
                         p ('<actual value="' || indicator_value_loop.p_value || '">');
                         p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
                         p ('</actual></period>');
@@ -448,10 +491,94 @@ is
             
          end loop;
          
-         p ('</iati-activities>');
+         p ('</iati-activities>');        
          clobtofile ('iati202buza.xml', 'HV_XMLDIR', ll_xml);      
       end mainprogram;
+      
+      procedure orgfile
+      is
+         ll_xml clob;
+
+         procedure p (lv_regel varchar2)
+         is
+         begin
+            -- dbms_output.put_line (lv_regel);
+            dbms_lob.writeappend (ll_xml, length (lv_regel) + 1, lv_regel || chr (10));
+         end;
+      
+         begin
+            dbms_lob.createtemporary (ll_xml, true, dbms_lob.session);
+            p ('<?xml version="1.0" encoding="UTF-8"?>');
+
+            for budget_loop in (
+               select (select sum(a.grandtotal) from afgo_budget a where a.c_doctype_id = '1001309')  as p_total,
+               (select max(a.updated) from afgo_budget a where a.c_doctype_id = '1001309') as p_updated
+               from dual             
+            )
+            loop
+         
+			         p ('<iati-organisations version="2.02" generated-datetime="' || replace (to_char (sysdate, 'yyyy-mm-dd hh24:mi:ss'), ' ', 'T') || 'Z">');
+			         p ('<iati-organisation last-updated-datetime="' || replace (to_char (budget_loop.p_updated, 'yyyy-mm-dd hh24:mi:ss'), ' ', 'T') || 'Z">');
+			         p ('<organisation-identifier>NL-KVK-41198677</organisation-identifier>');
+		           p ('<name>');
+			         p ('<narrative><![CDATA[Hivos]]></narrative>');
+			         p ('</name>');
+               p ('<reporting-org ref="NL-KVK-41198677" type="21"><narrative><![CDATA[Hivos]]></narrative></reporting-org>');
+			         p ('<total-budget>');
+               p ('<period-start iso-date="' || to_char(trunc(sysdate,'YEAR'), 'yyyy-mm-dd') || '" />');
+               p ('<period-end iso-date="' || to_char(trunc(sysdate,'YEAR'), 'yyyy') || '-12-31" />');         
+			         p ('<value currency="EUR" value-date="'||to_char(budget_loop.p_updated, 'yyyy-mm-dd')||'">'|| budget_loop.p_total ||'</value>');
+
+               for budgetline_loop in (
+                  select a.afgo_budget_id as p_ref, c.name as p_description, a.dateacct as p_date, a.grandtotal as p_value, b.iso_code as p_currency from afgo_budget a
+                  inner join c_currency b on a.c_currency_id = b.c_currency_id
+                  inner join afgo_program c on a.afgo_program_id = c.afgo_program_id
+                  where a.c_doctype_id = '1001309'            
+               )
+               loop
+			            p ('<budget-line ref="'|| budgetline_loop.p_ref ||'">');
+			            p ('<value currency="'|| budgetline_loop.p_currency ||'" value-date="' || to_char(budgetline_loop.p_date, 'yyyy-mm-dd') || '">'|| budgetline_loop.p_value ||'</value>');
+			            p ('<narrative xml:lang="en"><![CDATA['|| nvl(budgetline_loop.p_description,'Undescribed budget line') ||']]></narrative>');
+			            p ('</budget-line>');
+               end loop;   
+
+			         p ('</total-budget>');
+			         p ('<document-link format="text/html" url="http://hivosannualreport.org/">');
+			         p ('<title>');
+			         p ('<narrative xml:lang="en"><![CDATA[Hivos Annual Report]]></narrative>');
+			         p ('</title>');
+			         p ('<category code="B01"/>');
+			         p ('<language code="en"/>');
+			         p ('<document-date iso-date="'||to_char(budget_loop.p_updated, 'yyyy-mm-dd')||'"/>');
+			         p ('</document-link>');
+			         p ('</iati-organisation>');
+			         p ('</iati-organisations>');
+            end loop;
+         
+            clobtofile ('iati202buza-orgfile.xml', 'HV_XMLDIR', ll_xml);      
+         end orgfile;	      
    end hv_iati202_buza; 
 /
 
 exec jasper.hv_iati202_buza.mainprogram;
+exec jasper.hv_iati202_buza.orgfile;
+-- to sync linked iati documents, go to osiris1 prod.
+-- as user compiere:
+--[compiere@osiris root]$ cd /home/compiere/
+--[compiere@osiris ~]$ /u01/app/oracle/product/10.2.0/db_1/bin/sqlplus compiere/$(cat /var/pcache/1)@compiere.osiris @/home/compiere/hv_iati_documents.sql
+--[compiere@osiris ~]$ cat hv_iati_documents.sh
+--scp /compiere/storage/EXTA_1162806.pdf iati@iati1.hivos.nl:/var/www/html/docs/
+--run the resulting scp commands via bash -x or so
+
+-- here is the contents of /home/compiere/hv_iati_documents.sql for documentation
+--SET HEADING OFF;
+--SET NEWPAGE NONE;
+--SET TRIMSPOOL ON;
+--SET FEEDBACK OFF;
+--SET LINE 8000;
+--SPOOL /home/compiere/hv_iati_documents.sh; 
+--
+--select '/usr/bin/scp /compiere/storage/'||exta_attxt_url||' iati@iati1.hivos.nl:/var/www/html/docs/' from jasper.hv_att_qvw where jasper.hv_att_qvw.exta_category_id='1000300';
+--
+--SPOOL OFF;
+--QUIT;
