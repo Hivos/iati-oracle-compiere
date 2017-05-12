@@ -20,8 +20,11 @@ Assumes you have an Oracle 11 instance running with a copy of your production da
 
 
 ### Running the export
-exec reporting.hv_xml.iati_activities_xml;
-Dumps xml to /home/oracle/iati-activities.xml
+
+    exec jasper.hv_iati202_buza.mainprogram;
+    exec jasper.hv_iati202_buza.orgfile;
+
+Dumps xml to /home/oracle/iati202buza.xml
 
 
 ### Altering code
