@@ -13,7 +13,7 @@ The code written for use with Oracle 11 Express Edition, DO NOT ATTEMPT TO RUN T
 ### Viewing results:
 
     https://www.iatiregistry.org/publisher/stichting_hivos
-     
+    http://www.d-portal.org/ctrack.html?search=hivos#view=list_activities&reporting_ref=NL-KVK-41198677 
 
 ### Install instruction
 Assumes you have an Oracle 11 instance running with a copy of your production data in the Compiere schema. I recommend to use SQL Developer to run these scripts. As Oracle user COMPIERE run:
