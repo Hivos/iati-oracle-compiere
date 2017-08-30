@@ -47,6 +47,8 @@ afgo_scheduleitem.afgo_projectcluster_id,
 afgo_criteriumset.afgo_criteriumset_id,
 afgo_criterium.afgo_criterium_id,
 afgo_scheduleitem.afgo_scheduleitem_id,
+afgo_scheduleitemtype.afgo_scheduleitemtype_id,
+afgo_scheduleitem.SALESREP_ID,
 afgo_scheduleitem.datedoc,
 case 
 when to_char(afgo_scheduleitemtype.name) = 'IATI all baseline data2' then 'IATI all baseline data'
@@ -81,7 +83,8 @@ left outer join afgo_criterium on afgo_assessmentline.afgo_criterium_id = afgo_c
 left outer join ad_ref_list on afgo_assessmentline.listscore_id = ad_ref_list.ad_ref_list_id
 left outer join afgo_scheduleitemtype on afgo_scheduleitem.afgo_scheduleitemtype_id = afgo_scheduleitemtype.afgo_scheduleitemtype_id
 left outer join afgo_criteriumset on afgo_assessmentline.afgo_criteriumset_id = afgo_criteriumset.afgo_criteriumset_id
-left outer join ad_reference on afgo_criterium.ad_reference_id = ad_reference.ad_reference_id;
+left outer join ad_reference on afgo_criterium.ad_reference_id = ad_reference.ad_reference_id
+where afgo_scheduleitem.isactive = 'Y';
 
 
 CREATE OR REPLACE PACKAGE JASPER.hv_iati202_buza
@@ -170,7 +173,7 @@ is
             afgo_fund.description as p_description,
             afgo_fund.startdate as p_datestart,
             afgo_fund.enddate as p_dateend
-            from afgo_fund where afgo_fund_id in ('1010612','1010613','1010614','1011100','1011900')
+            from afgo_fund where afgo_fund_id in ('1010612','1010613','1010614','1011100','1011900','1012303','1012313','10128201','1013200')
             order by afgo_fund.documentno
          )
       
