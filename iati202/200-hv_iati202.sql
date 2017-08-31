@@ -48,7 +48,6 @@ afgo_criteriumset.afgo_criteriumset_id,
 afgo_criterium.afgo_criterium_id,
 afgo_scheduleitem.afgo_scheduleitem_id,
 afgo_scheduleitemtype.afgo_scheduleitemtype_id,
-afgo_scheduleitem.SALESREP_ID,
 afgo_scheduleitem.datedoc,
 case 
 when to_char(afgo_scheduleitemtype.name) = 'IATI all baseline data2' then 'IATI all baseline data'
@@ -173,7 +172,7 @@ is
             afgo_fund.description as p_description,
             afgo_fund.startdate as p_datestart,
             afgo_fund.enddate as p_dateend
-            from afgo_fund where afgo_fund_id in ('1010612','1010613','1010614','1011100','1011900','1012303','1012313','10128201','1013200')
+            from afgo_fund where afgo_fund_id in ('1010612','1010613','1010614','1011100','1011900','1012303','1012313','1012801','1013200')
             order by afgo_fund.documentno
          )
       
