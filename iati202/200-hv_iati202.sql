@@ -21,7 +21,19 @@ SELECT * FROM C_BPARTNER WHERE CONFIDENTIALITYSTATUS = 'P';
 
 --Here we skip some records that are a result of wrong input
 CREATE OR REPLACE VIEW JASPER.HV_AFGO_FUNDSCHEDULE AS
-SELECT * FROM AFGO_FUNDSCHEDULE 
+SELECT 
+afgo_fundschedule.grandtotal,
+afgo_fundschedule.afgo_quarter_id,
+afgo_fundschedule.c_currency_id,
+afgo_fundschedule.afgo_fund_id,
+afgo_fundschedule.description,
+afgo_fundschedule.afgo_fundschedule_id,
+afgo_fundschedule.dateinvoiced,
+c_bpartner.referenceno
+FROM AFGO_FUNDSCHEDULE 
+INNER JOIN AFGO_FUND ON AFGO_FUNDSCHEDULE.AFGO_FUND_ID = AFGO_FUND.AFGO_FUND_ID
+inner join afgo_fundprovider on afgo_fund.afgo_fundprovider_id = afgo_fundprovider.afgo_fundprovider_id
+inner join c_bpartner on afgo_fundprovider.c_bpartner_id = c_bpartner.c_bpartner_id
 WHERE AFGO_FUNDSCHEDULE_ID NOT IN (
 '1011123',
 '1011124',
@@ -171,8 +183,12 @@ is
             afgo_fund.description as p_title,
             afgo_fund.description as p_description,
             afgo_fund.startdate as p_datestart,
-            afgo_fund.enddate as p_dateend
-            from afgo_fund where afgo_fund_id in ('1010612','1010613','1010614','1011100','1011900','1012303','1012313','1012801','1013200')
+            afgo_fund.enddate as p_dateend,
+            hv_c_bpartner.referenceno as p_referenceno
+            from afgo_fund
+            inner join afgo_fundprovider on afgo_fund.afgo_fundprovider_id = afgo_fundprovider.afgo_fundprovider_id
+            inner join hv_c_bpartner on afgo_fundprovider.c_bpartner_id = hv_c_bpartner.c_bpartner_id
+            where afgo_fund_id in ('1010612','1010613','1010614','1011100','1011900','1012303','1012313','1012801','1013200','1011200','1012710')
             order by afgo_fund.documentno
          )
       
@@ -183,7 +199,7 @@ is
             p ('<title><narrative><![CDATA['|| nvl(activity.p_title,'Untitled activity') ||']]></narrative></title>');
             p ('<description><narrative><![CDATA[' || nvl(activity.p_description,'Undescribed activity') || ']]></narrative></description>');
             p ('<participating-org ref="NL-KVK-41198677" role="2" type="21"></participating-org>');
-            p ('<participating-org ref="XM-DAC-7" role="1" type="10"></participating-org>');
+            p ('<participating-org ref="'|| activity.p_referenceno ||'" role="1" type="10"></participating-org>');
             p ('<participating-org ref="NL-KVK-41198677" role="4" type="21"></participating-org>');
             p ('<activity-status code="2" />');
             p ('<activity-date iso-date="' || to_char (nvl(activity.p_datestart,sysdate), 'yyyy-mm-dd') || '" type="1" />');
@@ -220,21 +236,23 @@ is
                hv_afgo_fundschedule.description as p_description,
                c_currency.iso_code as p_currency,
                afgo_fund.referenceno as p_provider_act,
-               c_invoice.grandtotal as p_value
+               c_invoice.grandtotal as p_value,
+               hv_afgo_fundschedule.referenceno as p_referenceno
                from jasper.hv_afgo_fundschedule
                inner join c_currency on hv_afgo_fundschedule.c_currency_id = c_currency.c_currency_id 
                inner join afgo_fund on hv_afgo_fundschedule.afgo_fund_id = afgo_fund.afgo_fund_id
                inner join c_invoice on jasper.hv_afgo_fundschedule.afgo_fundschedule_id = c_invoice.afgo_fundschedule_id
                where 
                hv_afgo_fundschedule.afgo_fund_id = activity.afgo_fund_id
-               and c_invoice.dateinvoiced <= sysdate
+               and 
+               c_invoice.dateinvoiced <= sysdate
                order by c_invoice.dateinvoiced
                )
             loop
                p ('<transaction><transaction-type code="1" />');
                p ('<transaction-date iso-date="' || to_char (nvl(transact_in.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
                p ('<value currency="' || transact_in.p_currency || '" value-date="' || to_char (nvl(transact_in.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_in.p_value || '</value>');
-               p ('<provider-org provider-activity-id="' || transact_in.p_provider_act || '" ref="XM-DAC-7" />');               
+               p ('<provider-org provider-activity-id="' || transact_in.p_provider_act || '" ref="' || transact_in.p_referenceno || '" />');               
                p ('</transaction>');
             end loop;
 
@@ -245,21 +263,22 @@ is
                hv_afgo_fundschedule.description as p_description,
                c_currency.iso_code as p_currency,
                afgo_fund.referenceno as p_provider_act,
-               sum(hv_afgo_fundschedule.grandtotal) as p_sum
+               sum(hv_afgo_fundschedule.grandtotal) as p_sum,
+               hv_afgo_fundschedule.referenceno as p_referenceno
                from jasper.hv_afgo_fundschedule
                inner join afgo_quarter on jasper.hv_afgo_fundschedule.afgo_quarter_id = afgo_quarter.afgo_quarter_id
                inner join c_currency on hv_afgo_fundschedule.c_currency_id = c_currency.c_currency_id 
                inner join afgo_fund on hv_afgo_fundschedule.afgo_fund_id = afgo_fund.afgo_fund_id
                where 
                hv_afgo_fundschedule.afgo_fund_id = activity.afgo_fund_id
-               group by hv_afgo_fundschedule.dateinvoiced, hv_afgo_fundschedule.description, c_currency.iso_code, afgo_fund.referenceno
+               group by hv_afgo_fundschedule.dateinvoiced, hv_afgo_fundschedule.description, c_currency.iso_code, afgo_fund.referenceno, hv_afgo_fundschedule.referenceno
                order by  hv_afgo_fundschedule.dateinvoiced
             )
             loop
                p ('<transaction><transaction-type code="11" />');
                p ('<transaction-date iso-date="' || to_char (nvl(transact_co.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
                p ('<value currency="' || transact_co.p_currency || '" value-date="' || to_char (nvl(transact_co.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_co.p_sum || '</value>');
-               p ('<provider-org provider-activity-id="' || transact_co.p_provider_act || '" ref="XM-DAC-7" />');               
+               p ('<provider-org provider-activity-id="' || transact_co.p_provider_act || '" ref="' || transact_co.p_referenceno || '" />');               
                p ('</transaction>');
             end loop;
 
