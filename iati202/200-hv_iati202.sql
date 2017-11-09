@@ -184,7 +184,8 @@ is
             afgo_fund.description as p_description,
             afgo_fund.startdate as p_datestart,
             afgo_fund.enddate as p_dateend,
-            hv_c_bpartner.referenceno as p_referenceno
+            hv_c_bpartner.referenceno as p_referenceno,
+            hv_c_bpartner.name as p_partnername
             from afgo_fund
             inner join afgo_fundprovider on afgo_fund.afgo_fundprovider_id = afgo_fundprovider.afgo_fundprovider_id
             inner join hv_c_bpartner on afgo_fundprovider.c_bpartner_id = hv_c_bpartner.c_bpartner_id
@@ -198,9 +199,9 @@ is
             p ('<reporting-org ref="NL-KVK-41198677" type="21"><narrative><![CDATA[Hivos]]></narrative></reporting-org>');
             p ('<title><narrative><![CDATA['|| nvl(activity.p_title,'Untitled activity') ||']]></narrative></title>');
             p ('<description><narrative><![CDATA[' || nvl(activity.p_description,'Undescribed activity') || ']]></narrative></description>');
-            p ('<participating-org ref="NL-KVK-41198677" role="2" type="21"></participating-org>');
-            p ('<participating-org ref="'|| activity.p_referenceno ||'" role="1" type="10"></participating-org>');
-            p ('<participating-org ref="NL-KVK-41198677" role="4" type="21"></participating-org>');
+            p ('<participating-org ref="NL-KVK-41198677" role="2" type="21"><narrative><![CDATA[Hivos]]></narrative></participating-org>');
+            p ('<participating-org ref="'|| activity.p_referenceno ||'" role="1" type="10"><narrative><![CDATA['|| nvl(activity.p_partnername,'Unnamed partner') ||']]></narrative></participating-org>');
+            p ('<participating-org ref="NL-KVK-41198677" role="4" type="21"><narrative><![CDATA[Hivos]]></narrative></participating-org>');
             p ('<activity-status code="2" />');
             p ('<activity-date iso-date="' || to_char (nvl(activity.p_datestart,sysdate), 'yyyy-mm-dd') || '" type="1" />');
             p ('<activity-date iso-date="' || to_char (nvl(activity.p_dateend,sysdate+1), 'yyyy-mm-dd') || '" type="3" />');
@@ -385,12 +386,13 @@ is
             p ('<default-tied-status code="5" />');
             --transaction disbursement/expenditure loop
             for transact_disb in (
-               select c_invoice.dateacct as p_date, hv_c_bpartner.name as p_name, c_currency.iso_code as p_currency, c_invoiceline.linenetamt as p_value 
+               select c_invoice.dateacct as p_date, hv_c_bpartner.name as p_name, c_currency.iso_code as p_currency, c_invoiceline.linenetamt as p_value, afgo_commitment.confidentialitystatus as p_confidentialitystatus
                from afgo_fundallocation 
                inner join c_invoiceline on afgo_fundallocation.c_invoiceline_id = c_invoiceline.c_invoiceline_id
                inner join c_invoice on c_invoiceline.c_invoice_id = c_invoice.c_invoice_id
                inner join jasper.hv_c_bpartner on c_invoice.c_bpartner_id = jasper.hv_c_bpartner.c_bpartner_id
                inner join c_currency on c_invoice.c_currency_id = c_currency.c_currency_id 
+               left outer join afgo_commitment on c_invoice.afgo_commitment_id = afgo_commitment.afgo_commitment_id
                where 
                afgo_fundallocation.afgo_projectcluster_id = childact.afgo_projectcluster_id
                and afgo_fundallocation.afgo_fund_id = childact.afgo_fund_id
@@ -401,12 +403,16 @@ is
             loop
                if regexp_like (lower(transact_disb.p_name), 'hivos') then
                   p ('<transaction><transaction-type code="4" />');
+                  p ('<transaction-date iso-date="' || to_char (nvl(transact_disb.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
+                  p ('<value currency="' || transact_disb.p_currency || '" value-date="' || to_char (nvl(transact_disb.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_disb.p_value || '</value>');
                else
                   p ('<transaction><transaction-type code="3" />');
+                  p ('<transaction-date iso-date="' || to_char (nvl(transact_disb.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
+                  p ('<value currency="' || transact_disb.p_currency || '" value-date="' || to_char (nvl(transact_disb.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_disb.p_value || '</value>');
+                  if (transact_disb.p_confidentialitystatus <> 'C') then --there all nulls here
+                     p ('<receiver-org><narrative><![CDATA[' || transact_disb.p_name || ']]></narrative></receiver-org>');
+                  end if;
                end if;    
-               p ('<transaction-date iso-date="' || to_char (nvl(transact_disb.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
-               p ('<value currency="' || transact_disb.p_currency || '" value-date="' || to_char (nvl(transact_disb.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_disb.p_value || '</value>');
-               p ('<receiver-org><narrative><![CDATA[' || transact_disb.p_name || ']]></narrative></receiver-org>');
                p ('</transaction>');               
             end loop;
 
@@ -486,22 +492,36 @@ is
                         p ('<baseline year="' || indicator_value_loop.p_year || '" value="' || indicator_value_loop.p_value || '">');
                         p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
                         p ('</baseline>');
-                     elsif (indicator_value_loop.afgo_scheduleitem_name = 'IATI results target data') then
-                        p ('<period>');
-                        p ('<period-start iso-date="' || to_char(trunc(nvl(childact.p_datestart,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
-                        p ('<period-end iso-date="' || to_char (nvl(childact.p_dateend,sysdate), 'yyyy-mm-dd') || '" />');
-                        p ('<target value="' || indicator_value_loop.p_value || '">');
-                        p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
-                        p ('</target></period>');
-                     else   
-                        p ('<period>');
-                        p ('<period-start iso-date="' || to_char(trunc(nvl(childact.p_datestart,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
-                        p ('<period-end iso-date="' || to_char(sysdate, 'yyyy-mm-dd') || '" />');
-                        p ('<actual value="' || indicator_value_loop.p_value || '">');
-                        p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
-                        p ('</actual></period>');
                      end if;
                   end loop;
+                  
+                  p ('<period>');
+                  p ('<period-start iso-date="' || to_char(trunc(nvl(childact.p_datestart,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
+                  p ('<period-end iso-date="' || to_char (nvl(childact.p_dateend,sysdate), 'yyyy-mm-dd') || '" />');
+                  
+                  for indicator_value_loop in (
+                     select a.afgo_scheduleitem_name, a.datedoc datedoc, extract (year from a.datedoc) as p_year, DBMS_LOB.SUBSTR(a.longdescription, 32000) as p_description, a.numericscore || a.integerscore as p_value, a.afgo_criterium_id
+                     from jasper.hv_iati202_buza_vw a where 
+                     a.afgo_projectcluster_id = childact.afgo_projectcluster_id 
+                     and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
+                     and a.afgo_criterium_id = indicator_loop.afgo_criterium_id
+                     and a.description = 'IATI indicator'                                             
+                     order by decode(a.afgo_scheduleitem_name, 'IATI all baseline data', 1, 'IATI results target data', 2, 'IATI results actual data', 3, 4)
+                  )
+                  loop
+
+                     if (indicator_value_loop.afgo_scheduleitem_name = 'IATI results target data') then
+                        p ('<target value="' || indicator_value_loop.p_value || '">');
+                        p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
+                        p ('</target>');
+                     elsif (indicator_value_loop.afgo_scheduleitem_name = 'IATI results actual data') then
+                        p ('<actual value="' || indicator_value_loop.p_value || '">');
+                        p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
+                        p ('</actual>');
+                        end if;
+                  end loop;
+                  
+                  p ('</period>');
                   p ('</indicator>');
                end loop;
                
