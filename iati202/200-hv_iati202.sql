@@ -315,6 +315,7 @@ is
             from afgo_projectcluster
             inner join afgo_fundallocation on afgo_projectcluster.afgo_projectcluster_id = afgo_fundallocation.afgo_projectcluster_id	
             where afgo_fundallocation.afgo_fund_id = activity.afgo_fund_id
+            and afgo_projectcluster.afgo_projectcluster_id  in ('1006710','1006709','1006708','1006707','1006719','1006701','1007200','1006717','1008706','1008718','1009105','1009701','1007009')
             order by afgo_projectcluster.afgo_projectcluster_id
          )
       
@@ -386,7 +387,7 @@ is
             p ('<default-tied-status code="5" />');
             --transaction disbursement/expenditure loop
             for transact_disb in (
-               select c_invoice.dateacct as p_date, hv_c_bpartner.name as p_name, c_currency.iso_code as p_currency, c_invoiceline.linenetamt as p_value, afgo_commitment.confidentialitystatus as p_confidentialitystatus
+               select c_invoice.dateacct as p_date, hv_c_bpartner.name as p_name, c_currency.iso_code as p_currency, c_invoiceline.linenetamt as p_value,  nvl(afgo_commitment.confidentialitystatus, 'P') as p_confidentialitystatus, c_invoice.C_DOCTYPE_ID as p_doctype_id
                from afgo_fundallocation 
                inner join c_invoiceline on afgo_fundallocation.c_invoiceline_id = c_invoiceline.c_invoiceline_id
                inner join c_invoice on c_invoiceline.c_invoice_id = c_invoice.c_invoice_id
@@ -401,7 +402,7 @@ is
                order by c_invoice.dateacct, c_invoiceline.linenetamt
             )
             loop
-               if regexp_like (lower(transact_disb.p_name), 'hivos') then
+               if (regexp_like (lower(transact_disb.p_name), 'hivos') OR  transact_disb.p_doctype_id = '1001509') then
                   p ('<transaction><transaction-type code="4" />');
                   p ('<transaction-date iso-date="' || to_char (nvl(transact_disb.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
                   p ('<value currency="' || transact_disb.p_currency || '" value-date="' || to_char (nvl(transact_disb.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_disb.p_value || '</value>');
@@ -409,7 +410,7 @@ is
                   p ('<transaction><transaction-type code="3" />');
                   p ('<transaction-date iso-date="' || to_char (nvl(transact_disb.p_date,sysdate), 'yyyy-mm-dd') || '"/>');
                   p ('<value currency="' || transact_disb.p_currency || '" value-date="' || to_char (nvl(transact_disb.p_date,sysdate), 'yyyy-mm-dd') || '">' || transact_disb.p_value || '</value>');
-                  if (transact_disb.p_confidentialitystatus <> 'C') then --there all nulls here
+                  if (transact_disb.p_confidentialitystatus = 'P') then --there all nulls here
                      p ('<receiver-org><narrative><![CDATA[' || transact_disb.p_name || ']]></narrative></receiver-org>');
                   end if;
                end if;    
