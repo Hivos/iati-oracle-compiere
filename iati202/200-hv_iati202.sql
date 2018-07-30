@@ -489,7 +489,7 @@ is
                      and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
                      and a.afgo_criterium_id = indicator_loop.afgo_criterium_id
                      and a.description = 'IATI indicator'                                             
-                     order by decode(a.afgo_scheduleitem_name, 'IATI all baseline data', 1, 'IATI results target data', 2, 'IATI results actual data', 3, 4)
+                     order by decode(a.afgo_scheduleitem_name, 'IATI all baseline data', 1, 'IATI results target data', 2, 'IATI results actual data', 3, 'IATI results yearly targets',4, 'IATI results yearly actuals', 5, 6)
                   )
                   loop
                      if (indicator_value_loop.afgo_scheduleitem_name = 'IATI all baseline data') then
@@ -498,11 +498,7 @@ is
                         p ('</baseline>');
                      end if;
                   end loop;
-                  
-                  p ('<period>');
-                  p ('<period-start iso-date="' || to_char(trunc(nvl(childact.p_datestart,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
-                  p ('<period-end iso-date="' || to_char (nvl(childact.p_dateend,sysdate), 'yyyy-mm-dd') || '" />');
-                  
+                                   
                   for indicator_value_loop in (
                      select a.afgo_scheduleitem_name, a.datedoc datedoc, extract (year from a.datedoc) as p_year, DBMS_LOB.SUBSTR(a.longdescription, 32000) as p_description, a.numericscore || a.integerscore || DBMS_LOB.SUBSTR(a.textscore, 32000) || a.AFGO_CRITERIUMVALUE_ID as p_value, a.afgo_criterium_id
                      from jasper.hv_iati202_buza_vw a where 
@@ -510,70 +506,28 @@ is
                      and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
                      and a.afgo_criterium_id = indicator_loop.afgo_criterium_id
                      and a.description = 'IATI indicator'                                             
-                     order by decode(a.afgo_scheduleitem_name, 'IATI all baseline data', 1, 'IATI results target data', 2, 'IATI results actual data', 3, 4)
+                     order by decode(a.afgo_scheduleitem_name, 'IATI all baseline data', 1, 'IATI results target data', 2, 'IATI results actual data', 3, 'IATI results yearly targets',4, 'IATI results yearly actuals', 5, 6)
                   )
                   loop
+                 
+                     if ((indicator_value_loop.afgo_scheduleitem_name = 'IATI results target data') OR (indicator_value_loop.afgo_scheduleitem_name = 'IATI results actual data')) then
+                        p ('<period><period-start iso-date="' || to_char(trunc(nvl(childact.p_datestart,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
+                        p ('<period-end iso-date="' || to_char (nvl(childact.p_dateend,sysdate), 'yyyy-mm-dd') || '" />');
+                     elsif ((indicator_value_loop.afgo_scheduleitem_name = 'IATI results yearly targets') OR (indicator_value_loop.afgo_scheduleitem_name = 'IATI results yearly actuals')) then
+                        p ('<period><period-start iso-date="' || to_char(trunc(nvl(indicator_value_loop.datedoc,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
+                        p ('<period-end iso-date="' || to_char (nvl(indicator_value_loop.datedoc,sysdate), 'yyyy-mm-dd') || '" />');
+                     end if;
 
-                     if (indicator_value_loop.afgo_scheduleitem_name = 'IATI results target data') then
+                     if ((indicator_value_loop.afgo_scheduleitem_name = 'IATI results target data') OR (indicator_value_loop.afgo_scheduleitem_name = 'IATI results yearly targets')) then
                         p ('<target value="' || indicator_value_loop.p_value || '">');
                         p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
-                        p ('</target>');
-                     elsif (indicator_value_loop.afgo_scheduleitem_name = 'IATI results actual data') then
+                        p ('</target></period>');
+                     elsif ((indicator_value_loop.afgo_scheduleitem_name = 'IATI results actual data') OR (indicator_value_loop.afgo_scheduleitem_name = 'IATI results yearly actuals')) then
                         p ('<actual value="' || indicator_value_loop.p_value || '">');
                         p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
-                        p ('</actual>');
+                        p ('</actual></period>');
                      end if;
                   end loop;
-                  
-                  p ('</period>');
-
-
-                  --yearly results --hierzo
-                  for yearly_value_loop1 in (
-                     select a.afgo_scheduleitem_name, a.datedoc datedoc, extract (year from a.datedoc) as p_year, DBMS_LOB.SUBSTR(a.longdescription, 32000) as p_description, a.numericscore || a.integerscore || DBMS_LOB.SUBSTR(a.textscore, 32000) || a.AFGO_CRITERIUMVALUE_ID as p_value, a.afgo_criterium_id
-                     from jasper.hv_iati202_buza_vw a where 
-                     a.afgo_projectcluster_id = childact.afgo_projectcluster_id 
-                     and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
-                     and a.afgo_criterium_id = indicator_loop.afgo_criterium_id
-                     and a.description = 'IATI indicator'
-                     and a.afgo_scheduleitem_name in ('IATI results yearly targets','IATI results yearly actuals')
-                     and rownum <= 2
-                     order by decode(a.afgo_scheduleitem_name, 'IATI all baseline data', 1, 'IATI results target data', 2, 'IATI results actual data', 3, 4)                     
-                  )
-                  loop
-
-                     p ('<period>');
-                     p ('<period-start iso-date="' || to_char(trunc(nvl(yearly_value_loop1.datedoc,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
-                     p ('<period-end iso-date="' || to_char (nvl(yearly_value_loop1.datedoc,sysdate), 'yyyy-mm-dd') || '" />');                  
-                  
-                     for yearly_value_loop in (
-                        select a.afgo_scheduleitem_name, a.datedoc datedoc, extract (year from a.datedoc) as p_year, DBMS_LOB.SUBSTR(a.longdescription, 32000) as p_description, a.numericscore || a.integerscore || DBMS_LOB.SUBSTR(a.textscore, 32000) || a.AFGO_CRITERIUMVALUE_ID as p_value, a.afgo_criterium_id
-                        from jasper.hv_iati202_buza_vw a where 
-                        a.afgo_projectcluster_id = childact.afgo_projectcluster_id 
-                        and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
-                        and a.afgo_criterium_id = indicator_loop.afgo_criterium_id
-                        and a.description = 'IATI indicator'
-                        and a.datedoc = yearly_value_loop1.datedoc --hierzo
-                        and a.afgo_scheduleitem_name in ('IATI results yearly targets','IATI results yearly actuals')
-                        order by a.afgo_scheduleitem_name desc
-                     )
-                     loop                  
-                        if (yearly_value_loop.afgo_scheduleitem_name = 'IATI results yearly targets') then
-                           p ('<target value="' || yearly_value_loop.p_value || '">');
-                           p ('<comment><narrative><![CDATA[' || yearly_value_loop.p_description || ']]></narrative></comment>');
-                           p ('</target>');
-                        elsif (yearly_value_loop.afgo_scheduleitem_name = 'IATI results yearly actuals') then
-                           p ('<actual value="' || yearly_value_loop.p_value || '">');
-                           p ('<comment><narrative><![CDATA[' || yearly_value_loop.p_description || ']]></narrative></comment>');
-                           p ('</actual>');
-                        end if;                  
-                     end loop;
-
-                     p ('</period>');
-                  end loop;                            
-                  --end yearly results
-                  
-                  
                   p ('</indicator>');
                end loop;
                
