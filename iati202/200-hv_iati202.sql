@@ -56,6 +56,7 @@ WHERE AFGO_FUNDSCHEDULE_ID NOT IN (
 CREATE OR REPLACE VIEW jasper.hv_iati202_buza_vw AS
 SELECT
 afgo_scheduleitem.afgo_projectcluster_id,
+afgo_scheduleitem.afgo_fund_id,
 afgo_criteriumset.afgo_criteriumset_id,
 afgo_criterium.afgo_criterium_id,
 afgo_scheduleitem.afgo_scheduleitem_id,
@@ -302,6 +303,153 @@ is
                p('</document-link>');
             end loop;
             
+            --parent result
+            --result loop
+            --order by not possible in distinct http://docs.oracle.com/javadb/10.5.3.0/ref/rrefsqlj13658.html
+            for result_loop in (
+               select distinct a.afgo_criteriumset_id, a.setdescription as p_type, a.sethelp as p_title, a.setnote as p_description 
+               from jasper.hv_iati202_buza_vw a where 
+               a.afgo_fund_id = activity.afgo_fund_id
+               and a.description = 'IATI indicator'
+            )
+            loop
+               p ('<result type="'|| result_loop.p_type ||'" aggregation-status="0">');
+               p ('<title><narrative><![CDATA[' || result_loop.p_title || ']]></narrative></title>');
+               p ('<description><narrative><![CDATA[' || result_loop.p_description || ']]></narrative></description>');
+               
+               for indicator_loop in (
+                  select distinct a.afgo_criterium_id, a.measure as measure, a.help as p_title, a.documentnote as p_description 
+                  from jasper.hv_iati202_buza_vw a where 
+                  a.afgo_fund_id = activity.afgo_fund_id
+                  and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
+                  and a.description = 'IATI indicator'                 
+               )
+               loop
+                  p ('<indicator measure="' || indicator_loop.measure || '" ascending="1">');
+                  p ('<title><narrative><![CDATA[' || indicator_loop.p_title || ']]></narrative></title>');
+                  p ('<description><narrative><![CDATA[' || indicator_loop.p_description || ']]></narrative></description>');                  
+
+                  for indicator_value_loop in (
+                     select a.afgo_scheduleitem_name, a.datedoc datedoc, extract (year from a.datedoc) as p_year, DBMS_LOB.SUBSTR(a.longdescription, 32000) as p_description, a.numericscore || a.integerscore || DBMS_LOB.SUBSTR(a.textscore, 32000) || a.criteriumvalue as p_value, a.afgo_criterium_id
+                     from jasper.hv_iati202_buza_vw a where 
+                     a.afgo_fund_id = activity.afgo_fund_id
+                     and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
+                     and a.afgo_criterium_id = indicator_loop.afgo_criterium_id
+                     and a.description = 'IATI indicator'                                             
+                     order by decode(a.afgo_scheduleitem_name, 'IATI all baseline data', 1, 'IATI results target data', 2, 'IATI results actual data', 3, 'IATI results yearly targets',4, 'IATI results yearly actuals', 5, 6)
+                  )
+                  loop
+                     if (indicator_value_loop.afgo_scheduleitem_name = 'IATI all baseline data') then
+                        p ('<baseline year="' || indicator_value_loop.p_year || '" value="' || indicator_value_loop.p_value || '">');
+                        p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
+                        p ('</baseline>');
+                     end if;
+                  end loop;
+
+                 --this is a severe performance killer, and it only iterates from 2015 to 2030
+                  for indicator_period_loop in (
+                     SELECT c1 as p_period_year from dual
+                       MODEL DIMENSION BY (1 as rn)  MEASURES (1 as c1)
+                       RULES ITERATE (15)
+                       (c1[ITERATION_NUMBER]=ITERATION_NUMBER+2015)
+                       order by 1                  
+                  )
+                  loop
+
+                                   
+                     for indicator_value_preloop in (
+                        select a.afgo_scheduleitem_name, a.datedoc datedoc, extract (year from a.datedoc) as p_year, DBMS_LOB.SUBSTR(a.longdescription, 32000) as p_description, a.numericscore || a.integerscore || DBMS_LOB.SUBSTR(a.textscore, 32000) || a.criteriumvalue as p_value, a.afgo_criterium_id
+                        from jasper.hv_iati202_buza_vw a where 
+                        a.afgo_fund_id = activity.afgo_fund_id
+                        and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
+                        and a.afgo_criterium_id = indicator_loop.afgo_criterium_id
+                        and extract (year from a.datedoc) = indicator_period_loop.p_period_year
+                        and a.description = 'IATI indicator'                                             
+                        and a.afgo_scheduleitem_name IN ('IATI results target data','IATI results actual data')
+                        and rownum = 1
+                        order by decode(a.afgo_scheduleitem_name, 'IATI all baseline data', 1, 'IATI results target data', 2, 'IATI results actual data', 3, 'IATI results yearly targets',4, 'IATI results yearly actuals', 5, 6)
+                     )
+                     loop
+                        p ('<period><period-start iso-date="' || to_char(trunc(nvl(activity.p_datestart,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
+                        p ('<period-end iso-date="' || to_char (nvl(activity.p_dateend,sysdate), 'yyyy-mm-dd') || '" />');
+                        
+                        for indicator_value_loop in (
+                           select a.afgo_scheduleitem_name, a.datedoc datedoc, extract (year from a.datedoc) as p_year, DBMS_LOB.SUBSTR(a.longdescription, 32000) as p_description, a.numericscore || a.integerscore || DBMS_LOB.SUBSTR(a.textscore, 32000) || a.criteriumvalue as p_value, a.afgo_criterium_id
+                           from jasper.hv_iati202_buza_vw a where 
+                           a.afgo_fund_id = activity.afgo_fund_id
+                           and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
+                           and a.afgo_criterium_id = indicator_loop.afgo_criterium_id
+                           and extract (year from a.datedoc) = indicator_period_loop.p_period_year
+                           and a.description = 'IATI indicator'                                             
+                           and a.afgo_scheduleitem_name IN ('IATI results target data','IATI results actual data')
+                           order by decode(a.afgo_scheduleitem_name, 'IATI all baseline data', 1, 'IATI results target data', 2, 'IATI results actual data', 3, 'IATI results yearly targets',4, 'IATI results yearly actuals', 5, 6)
+                        )
+                        loop                        
+                           if ((indicator_value_loop.afgo_scheduleitem_name = 'IATI results target data') OR (indicator_value_loop.afgo_scheduleitem_name = 'IATI results yearly targets')) then
+                              p ('<target value="' || indicator_value_loop.p_value || '">');
+                              p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
+                              p ('</target>');
+                           elsif ((indicator_value_loop.afgo_scheduleitem_name = 'IATI results actual data') OR (indicator_value_loop.afgo_scheduleitem_name = 'IATI results yearly actuals')) then
+                              p ('<actual value="' || indicator_value_loop.p_value || '">');
+                              p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
+                              p ('</actual>');
+                           end if;                         
+                        end loop;                        
+                        p ('</period>');
+                     end loop;
+
+
+                     for indicator_value_preloop2 in (
+                        select a.afgo_scheduleitem_name, a.datedoc datedoc, extract (year from a.datedoc) as p_year, DBMS_LOB.SUBSTR(a.longdescription, 32000) as p_description, a.numericscore || a.integerscore || DBMS_LOB.SUBSTR(a.textscore, 32000) || a.criteriumvalue as p_value, a.afgo_criterium_id
+                        from jasper.hv_iati202_buza_vw a where 
+                        a.afgo_fund_id = activity.afgo_fund_id
+                        and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
+                        and a.afgo_criterium_id = indicator_loop.afgo_criterium_id
+                        and extract (year from a.datedoc) = indicator_period_loop.p_period_year
+                        and a.description = 'IATI indicator'                                             
+                        and a.afgo_scheduleitem_name IN ('IATI results yearly targets','IATI results yearly actuals')
+                        and rownum = 1
+                        order by decode(a.afgo_scheduleitem_name, 'IATI all baseline data', 1, 'IATI results target data', 2, 'IATI results actual data', 3, 'IATI results yearly targets',4, 'IATI results yearly actuals', 5, 6)
+                     )
+                     loop
+                        p ('<period><period-start iso-date="' || to_char(trunc(nvl(indicator_value_preloop2.datedoc,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
+                        p ('<period-end iso-date="' || to_char (nvl(indicator_value_preloop2.datedoc,sysdate), 'yyyy-mm-dd') || '" />');
+                        
+                        for indicator_value_loop2 in (
+                           select a.afgo_scheduleitem_name, a.datedoc datedoc, extract (year from a.datedoc) as p_year, DBMS_LOB.SUBSTR(a.longdescription, 32000) as p_description, a.numericscore || a.integerscore || DBMS_LOB.SUBSTR(a.textscore, 32000) || a.criteriumvalue as p_value, a.afgo_criterium_id
+                           from jasper.hv_iati202_buza_vw a where 
+                           a.afgo_fund_id = activity.afgo_fund_id
+                           and a.afgo_criteriumset_id = result_loop.afgo_criteriumset_id
+                           and a.afgo_criterium_id = indicator_loop.afgo_criterium_id
+                           and extract (year from a.datedoc) = indicator_period_loop.p_period_year
+                           and a.description = 'IATI indicator'                                             
+                           and a.afgo_scheduleitem_name IN ('IATI results yearly targets','IATI results yearly actuals')
+                           order by decode(a.afgo_scheduleitem_name, 'IATI all baseline data', 1, 'IATI results target data', 2, 'IATI results actual data', 3, 'IATI results yearly targets',4, 'IATI results yearly actuals', 5, 6)
+                        )
+                        loop                        
+                           if ((indicator_value_loop2.afgo_scheduleitem_name = 'IATI results target data') OR (indicator_value_loop2.afgo_scheduleitem_name = 'IATI results yearly targets')) then
+                              p ('<target value="' || indicator_value_loop2.p_value || '">');
+                              p ('<comment><narrative><![CDATA[' || indicator_value_loop2.p_description || ']]></narrative></comment>');
+                              p ('</target>');
+                           elsif ((indicator_value_loop2.afgo_scheduleitem_name = 'IATI results actual data') OR (indicator_value_loop2.afgo_scheduleitem_name = 'IATI results yearly actuals')) then
+                              p ('<actual value="' || indicator_value_loop2.p_value || '">');
+                              p ('<comment><narrative><![CDATA[' || indicator_value_loop2.p_description || ']]></narrative></comment>');
+                              p ('</actual>');
+                           end if;                         
+                        end loop;
+                        
+                        p ('</period>');
+                     end loop;
+                        
+                        
+                  end loop; --the indicator_period_preloop
+                
+                  p ('</indicator>');
+               end loop;
+               
+               p ('</result>');
+            end loop;   
+           
             p ('</iati-activity>');
 
          --generate child activities
@@ -458,7 +606,7 @@ is
             end loop;
 
             p ('<related-activity ref="NL-KVK-41198677-AFGO_FUND-' || childact.p_referenceno || '" type="1" />');
-            
+           
             --result loop
             --order by not possible in distinct http://docs.oracle.com/javadb/10.5.3.0/ref/rrefsqlj13658.html
             for result_loop in (
@@ -598,32 +746,9 @@ is
                         
                         
                   end loop; --the indicator_period_preloop
-                    /*
-                        if ((indicator_value_loop.afgo_scheduleitem_name = 'IATI results target data') OR (indicator_value_loop.afgo_scheduleitem_name = 'IATI results actual data')) then
-                           p ('<period><period-start iso-date="' || to_char(trunc(nvl(childact.p_datestart,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
-                           p ('<period-end iso-date="' || to_char (nvl(childact.p_dateend,sysdate), 'yyyy-mm-dd') || '" />');
-                        elsif ((indicator_value_loop.afgo_scheduleitem_name = 'IATI results yearly targets') OR (indicator_value_loop.afgo_scheduleitem_name = 'IATI results yearly actuals')) then
-                           p ('<period><period-start iso-date="' || to_char(trunc(nvl(indicator_value_loop.datedoc,sysdate),'YEAR'), 'yyyy-mm-dd') || '" />');
-                           p ('<period-end iso-date="' || to_char (nvl(indicator_value_loop.datedoc,sysdate), 'yyyy-mm-dd') || '" />');
-                        end if;
-   
-                        if ((indicator_value_loop.afgo_scheduleitem_name = 'IATI results target data') OR (indicator_value_loop.afgo_scheduleitem_name = 'IATI results yearly targets')) then
-                           p ('<target value="' || indicator_value_loop.p_value || '">');
-                           p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
-                           p ('</target></period>');
-                        elsif ((indicator_value_loop.afgo_scheduleitem_name = 'IATI results actual data') OR (indicator_value_loop.afgo_scheduleitem_name = 'IATI results yearly actuals')) then
-                           p ('<actual value="' || indicator_value_loop.p_value || '">');
-                           p ('<comment><narrative><![CDATA[' || indicator_value_loop.p_description || ']]></narrative></comment>');
-                           p ('</actual></period>');
-                        end if;  
-                        */
-                        
-                     
- 
-                  
+                
                   p ('</indicator>');
-               end loop;
-               
+               end loop;               
                p ('</result>');
             end loop;            
             p ('</iati-activity>');
